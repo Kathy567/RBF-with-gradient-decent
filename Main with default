@@ -1,0 +1,103 @@
+%% Initalization
+clear all
+close all
+clc
+
+% Rate of decent gradient
+eta = 0.00001;
+
+%% Import data
+[X,Xtrain,Ytrain,fig] = data_generator();
+x_count = length(Xtrain);
+
+%% Initialize number of centres
+M = 3;
+
+%% Initialize centers randomly
+for i = 1:M
+    centers(i)= Xtrain(i*floor(x_count/M)); 
+end
+flag = 1;
+
+%% Calculate centers
+while(flag) 
+    for i = 1:M 
+       cluster{i} = [];
+    end 
+    for i = 1:x_count 
+        distance = var(Xtrain);
+        for j = 1:M
+            curr = abs(Xtrain(i) - centers(j)); 
+            if curr < distance 
+                c = j; 
+                distance = curr; 
+            end 
+        end 
+        cluster{c} = [cluster{c}, Xtrain(i)];
+    end
+    % Update centers
+    for i = 1:M 
+        new_centers(i) = mean(cluster{i});
+    end
+    for i = 1:M 
+          diff(i) = abs(centers(i)-new_centers(i));
+     end 
+     if sum(diff) > 0.1 % Can be set by hand
+         flag = 1;
+         centers = new_centers; 
+     else
+         flag = 0; 
+     end    
+end
+
+for i = 1:M
+    curr = abs(centers - centers(i)); 
+    [~,b] = min(curr); 
+    curr(b) = var(Xtrain); 
+    curr_2 = min(curr); 
+    sigma(i) = curr_2; 
+end
+
+for i = 1:x_count
+    for j = 1:M 
+        curr = abs(Xtrain(i) - centers(j)); 
+        K(i,j) = exp(-1*curr^2/(2*sigma(j)^2)); % Output of the hiden layer
+    end 
+end
+
+%% Calculate weights 
+weights = pinv(K)*Ytrain'; % Ytrain = output of the hiden layer * weight
+
+%% Calculate output 
+for i = 1:length(X)
+    result = 0;
+    for j = 1:M
+        curr = weights(j)*exp(-1*abs(X(i)-centers(j))^2/(2*sigma(j)^2)); 
+        result = result + curr;
+    end
+    E = ((Ytrain(i) - result)^2)/2;
+end
+while(E > 1e-5)
+    for j = 1:M
+        for i = 1:length(X)
+            e1 = (Ytrain(i) - result)*exp(-1*(X(i)-centers(j)^2)/(2*sigma(j)^2))*(X(i)-centers(j));
+            e2 = (Ytrain(i) - result)*exp(-1*(X(i)-centers(j)^2)/(2*sigma(j)^2))*((X(i)-centers(j))^2);
+            e3 = (Ytrain(i) - result)*exp(-1*(X(i)-centers(j)^2)/(2*sigma(j)^2));
+        end
+        centers(j) = centers(j) + eta*weights(j)*e1/((sigma(j))^2);
+        sigma(j) = sigma(j) + eta*weights(j)*e2/((sigma(j))^3);
+        weights(j) = weights(j) + eta*e3;
+    end
+    for i = 1:length(X)
+        for j = 1:M
+            curr = weights(j)*exp(-1*abs(X(i)-centers(j))^2/(2*sigma(j)^2));
+            result = result + curr;
+        end
+        E = ((Ytrain(i) - result)^2)/2;
+    end
+end
+y(i) = result;
+
+plot(X, y, 'r.-')
+legend('original function','available data','RBFoutput','location','northwest')
+
